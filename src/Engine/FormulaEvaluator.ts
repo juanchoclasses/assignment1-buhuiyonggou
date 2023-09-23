@@ -18,6 +18,65 @@ export class FormulaEvaluator {
     this._sheetMemory = memory;
   }
 
+  private shuntingYard(tokens: TokenType[]): TokenType[] {
+    const output: TokenType[] = [];
+    const ops: TokenType[] = [];
+
+    for (const token of tokens) {
+        if (this.isNumber(token) || this.isCellReference(token)) {
+            output.push(token);
+        } else if ('+-*/'.includes(token)) {
+            while (ops.length && this.precedence(token) <= this.precedence(ops[ops.length - 1])) {
+                output.push(ops.pop()!);
+            }
+            ops.push(token);
+        } else if (token === '(') {
+            ops.push(token);
+        } else if (token === ')') {
+            while (ops.length && ops[ops.length - 1] !== '(') {
+                output.push(ops.pop()!);
+            }
+            ops.pop(); // pop '('
+        }
+    }
+    while (ops.length) {
+        output.push(ops.pop()!);
+    }
+    return output;
+}
+
+private precedence(op: TokenType): number {
+    if (op === '+' || op === '-') return 1;
+    if (op === '*' || op === '/') return 2;
+    return 0;
+}
+
+private evaluatePostfix(tokens: TokenType[]): number {
+    const stack: number[] = [];
+    for (const token of tokens) {
+        if (this.isNumber(token)) {
+            stack.push(Number(token));
+        } else if (this.isCellReference(token)) {
+            const [value, error] = this.getCellValue(token);
+            if (error) {
+                throw new Error(error);
+            }
+            stack.push(value);
+        } else {
+            const b = stack.pop()!;
+            const a = stack.pop()!;
+            if (token === '+') stack.push(a + b);
+            else if (token === '-') stack.push(a - b);
+            else if (token === '*') stack.push(a * b);
+            else if (token === '/') {
+                if (b === 0) throw new Error(ErrorMessages.divideByZero);
+                stack.push(a / b);
+            }
+        }
+    }
+    return stack[0];
+}
+
   /**
     * place holder for the evaluator.   I am not sure what the type of the formula is yet 
     * I do know that there will be a list of tokens so i will return the length of the array
