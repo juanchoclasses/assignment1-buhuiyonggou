@@ -18,64 +18,70 @@ export class FormulaEvaluator {
     this._sheetMemory = memory;
   }
 
-  private shuntingYard(tokens: TokenType[]): TokenType[] {
-    const output: TokenType[] = [];
-    const ops: TokenType[] = [];
+  private evaluator(): number {
+    // check for empty formula
+    if (this._currentFormula.length === 0) {
+        this._errorOccured = true;
+        this._errorMessage = ErrorMessages.partial;
+    }
+    let result: number = 0;
+    // Get the next token
+    const token = this._currentFormula.shift();
 
-    for (const token of tokens) {
-        if (this.isNumber(token) || this.isCellReference(token)) {
-            output.push(token);
-        } else if ('+-*/'.includes(token)) {
-            while (ops.length && this.precedence(token) <= this.precedence(ops[ops.length - 1])) {
-                output.push(ops.pop()!);
-            }
-            ops.push(token);
-        } else if (token === '(') {
-            ops.push(token);
-        } else if (token === ')') {
-            while (ops.length && ops[ops.length - 1] !== '(') {
-                output.push(ops.pop()!);
-            }
-            ops.pop(); // pop '('
+    // get result inside parentheses
+    if (this.isNumber(token)) {
+        result = parseFloat(token);
+        this._lastResult = result;
+    } else if (token === "(") {
+      // recusivley call the evaluator to get the result inside the parentheses
+        result = this.evaluator();
+        if (this._currentFormula.length === 0 || this._currentFormula.shift() !== ")") {
+            this._errorOccured = true;
+            this._errorMessage = ErrorMessages.missingParentheses;
+            this._lastResult = result;
         }
+    } else if (this.isCellReference(token)) {
+        [result, this._errorMessage] = this.getCellValue(token);
+        if (this._errorMessage) {
+            this._errorOccured = true;
+            this._lastResult = result;
+        }
+    } else {
+        this._errorOccured = true;
+        this._errorMessage = ErrorMessages.invalidFormula;
     }
-    while (ops.length) {
-        output.push(ops.pop()!);
-    }
-    return output;
-}
 
-private precedence(op: TokenType): number {
-    if (op === '+' || op === '-') return 1;
-    if (op === '*' || op === '/') return 2;
-    return 0;
-}
-
-private evaluatePostfix(tokens: TokenType[]): number {
-    const stack: number[] = [];
-    for (const token of tokens) {
-        if (this.isNumber(token)) {
-            stack.push(Number(token));
-        } else if (this.isCellReference(token)) {
-            const [value, error] = this.getCellValue(token);
-            if (error) {
-                throw new Error(error);
-            }
-            stack.push(value);
+    // calculate multiplication and division
+    while (this._currentFormula.length > 0 && (this._currentFormula[0] === "*" || this._currentFormula[0] === "/")) {
+        const op = this._currentFormula.shift();
+        // recursivley call the evaluator to get the result of the next block
+        let nextBlock: number = this.evaluator();
+        if (op === "*") {
+            result *= nextBlock;
         } else {
-            const b = stack.pop()!;
-            const a = stack.pop()!;
-            if (token === '+') stack.push(a + b);
-            else if (token === '-') stack.push(a - b);
-            else if (token === '*') stack.push(a * b);
-            else if (token === '/') {
-                if (b === 0) throw new Error(ErrorMessages.divideByZero);
-                stack.push(a / b);
+            if (nextBlock === 0) {
+                this._errorOccured = true;
+                this._errorMessage = ErrorMessages.divideByZero;
             }
+            result /= nextBlock;
         }
     }
-    return stack[0];
+
+    // calculate addition and subtraction
+    while (this._currentFormula.length > 0 && (this._currentFormula[0] === "+" || this._currentFormula[0] === "-")) {
+        const operator = this._currentFormula.shift();
+        // recursivley call the evaluator to get the result of the next term
+        let nextRes: number = this.evaluator();
+        if (operator === "+") {
+            result += nextRes;
+        } else {
+            result -= nextRes;
+        }
+    }
+    
+    return result;
 }
+
 
   /**
     * place holder for the evaluator.   I am not sure what the type of the formula is yet 
@@ -103,42 +109,21 @@ private evaluatePostfix(tokens: TokenType[]): number {
    */
 
   evaluate(formula: FormulaType) {
+    // check for empty formula
+    if (formula.length === 0) {
+      this._errorMessage = ErrorMessages.emptyFormula;
+      this._result = 0;
+      return;
+    }
+    // Clone the formula to modify it
+    this._currentFormula = [...formula];
+    this._lastResult = 0;
 
-
-    // set the this._result to the length of the formula
-
-    this._result = formula.length;
+    // reset the error flags and messages
+    this._errorOccured = false;
     this._errorMessage = "";
 
-    switch (formula.length) {
-      case 0:
-        this._errorMessage = ErrorMessages.emptyFormula;
-        break;
-      case 7:
-        this._errorMessage = ErrorMessages.partial;
-        break;
-      case 8:
-        this._errorMessage = ErrorMessages.divideByZero;
-        break;
-      case 9:
-        this._errorMessage = ErrorMessages.invalidCell;
-        break;
-      case 10:
-        this._errorMessage = ErrorMessages.invalidFormula;
-        break;
-      case 11:
-        this._errorMessage = ErrorMessages.invalidNumber;
-        break;
-      case 12:
-        this._errorMessage = ErrorMessages.invalidOperator;
-        break;
-      case 13:
-        this._errorMessage = ErrorMessages.missingParentheses;
-        break;
-      default:
-        this._errorMessage = "";
-        break;
-    }
+    this._result = this.evaluator();
   }
 
   public get error(): string {
@@ -148,8 +133,6 @@ private evaluatePostfix(tokens: TokenType[]): number {
   public get result(): number {
     return this._result;
   }
-
-
 
 
   /**

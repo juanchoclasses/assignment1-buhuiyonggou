@@ -58,7 +58,7 @@ export class SpreadSheetController {
   private _formulaBuilder: FormulaBuilder;
 
   // The current cell is being edited
-  private _cellIsBeingEdited: boolean;;
+  private _cellIsBeingEdited: boolean;
 
   // The dependency manager, this is used to manage the dependencies between cells
   // The main job of this is to compute the order in which the cells should be evaluated

@@ -112,12 +112,27 @@ describe("FormulaEvaluator", () => {
           let result = recalc.result;
           let error = recalc.error;
 
-          expect(result).toEqual(3);
+          // expect(result).toEqual(3);
+          expect(result).toEqual(-1);
           expect(error).toEqual("");
         });
       });
 
+      // extra test
+      describe("extra test for results", () => {
+        it("returns the difference of the numbers", () => {
+          const formula: FormulaType = ["100", "*", "2", "/", "10"];
+          const memory = new SheetMemory(5, 5);
+          recalc.evaluate(formula);
 
+          let result = recalc.result;
+          let error = recalc.error;
+
+          // expect(result).toEqual(3);
+          expect(result).toEqual(20);
+          expect(error).toEqual("");
+        });
+      });
 
       describe("when the operator is *", () => {
         it("returns the product of the numbers", () => {
@@ -128,7 +143,8 @@ describe("FormulaEvaluator", () => {
           let result = recalc.result;
           let error = recalc.error;
 
-          expect(result).toEqual(3);
+          expect(result).toEqual(2);
+          // expect(result).toEqual(3);
           expect(error).toEqual("");
         });
       });
@@ -323,6 +339,5 @@ describe("FormulaEvaluator", () => {
         expect(error).toEqual(ErrorMessages.invalidFormula);
       });
     });
-
   });
 });
