@@ -19,11 +19,6 @@ export class FormulaEvaluator {
   }
 
   private evaluator(): number {
-    // check for empty formula
-    if (this._currentFormula.length === 0) {
-        this._errorOccured = true;
-        this._errorMessage = ErrorMessages.partial;
-    }
     let result: number = 0;
     // Get the next token
     const token = this._currentFormula.shift();
@@ -31,20 +26,17 @@ export class FormulaEvaluator {
     // get result inside parentheses
     if (this.isNumber(token)) {
         result = parseFloat(token);
-        this._lastResult = result;
     } else if (token === "(") {
       // recusivley call the evaluator to get the result inside the parentheses
         result = this.evaluator();
         if (this._currentFormula.length === 0 || this._currentFormula.shift() !== ")") {
             this._errorOccured = true;
             this._errorMessage = ErrorMessages.missingParentheses;
-            this._lastResult = result;
         }
     } else if (this.isCellReference(token)) {
         [result, this._errorMessage] = this.getCellValue(token);
         if (this._errorMessage) {
             this._errorOccured = true;
-            this._lastResult = result;
         }
     } else {
         this._errorOccured = true;
@@ -72,16 +64,10 @@ export class FormulaEvaluator {
         const operator = this._currentFormula.shift();
         // recursivley call the evaluator to get the result of the next term
         let nextRes: number = this.evaluator();
-        if (operator === "+") {
-            result += nextRes;
-        } else {
-            result -= nextRes;
-        }
+        operator === "+" ? result += nextRes : result -= nextRes;
     }
-    
-    return result;
+      return result;
 }
-
 
   /**
     * place holder for the evaluator.   I am not sure what the type of the formula is yet 
@@ -111,19 +97,21 @@ export class FormulaEvaluator {
   evaluate(formula: FormulaType) {
     // check for empty formula
     if (formula.length === 0) {
-      this._errorMessage = ErrorMessages.emptyFormula;
       this._result = 0;
+      this._errorMessage = ErrorMessages.emptyFormula;
       return;
     }
-    // Clone the formula to modify it
+    // // Clone the formula to modify it
     this._currentFormula = [...formula];
-    this._lastResult = 0;
 
-    // reset the error flags and messages
+    // // reset the error flags and messages
     this._errorOccured = false;
     this._errorMessage = "";
 
     this._result = this.evaluator();
+
+    // if there are still non-number tokens in the formula set the errorOccured flag
+    this._currentFormula.length > 0 ? this._errorMessage = ErrorMessages.invalidFormula: this._errorOccured = false;
   }
 
   public get error(): string {
@@ -132,9 +120,7 @@ export class FormulaEvaluator {
 
   public get result(): number {
     return this._result;
-  }
-
-
+  }                            
   /**
    * 
    * @param token 
@@ -184,8 +170,6 @@ export class FormulaEvaluator {
     return [value, ""];
 
   }
-
-
 }
 
 export default FormulaEvaluator;
