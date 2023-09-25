@@ -116,12 +116,12 @@ export class FormulaEvaluator {
     * 
    */
 
-  evaluate(formula: FormulaType) {
+  evaluate(formula: FormulaType) : number{
     // check for empty formula
     if (formula.length === 0) {
       this._result = 0;
       this._errorMessage = ErrorMessages.emptyFormula;
-      return;
+      return 0;
     }
 
     // reset the error flags and messages
@@ -134,6 +134,8 @@ export class FormulaEvaluator {
 
     // if there are still non-number tokens in the formula, return an error
     this._currentFormula.length > 0 ? this._errorMessage = ErrorMessages.partial: this._errorOccured = false;
+
+    return this._result;
   }
 
   public get error(): string {
