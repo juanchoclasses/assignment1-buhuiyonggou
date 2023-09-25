@@ -21,13 +21,11 @@ export class FormulaEvaluator {
   private evaluator(): number {
     let result: number = 0;
     // Get the next token
-    const token = this._currentFormula.shift();
-
-    // get result inside parentheses
+    let token = this._currentFormula.shift();
+    // add numbers to the result and eliminate parentheses
     if (this.isNumber(token)) {
-        result = parseFloat(token);
+        result = Number(token);
     } else if (token === "(") {
-      // recusivley call the evaluator to get the result inside the parentheses
         result = this.evaluator();
         if (this._currentFormula.length === 0 || this._currentFormula.shift() !== ")") {
             this._errorOccured = true;
@@ -43,10 +41,9 @@ export class FormulaEvaluator {
         this._errorMessage = ErrorMessages.invalidFormula;
     }
 
-    // calculate multiplication and division
+    // Regardless of whether the token was a number or cell reference, handle multiplication and division
     while (this._currentFormula.length > 0 && (this._currentFormula[0] === "*" || this._currentFormula[0] === "/")) {
         const op = this._currentFormula.shift();
-        // recursivley call the evaluator to get the result of the next block
         let nextBlock: number = this.evaluator();
         if (op === "*") {
             result *= nextBlock;
@@ -59,15 +56,16 @@ export class FormulaEvaluator {
         }
     }
 
-    // calculate addition and subtraction
+    // Handle addition and subtraction
     while (this._currentFormula.length > 0 && (this._currentFormula[0] === "+" || this._currentFormula[0] === "-")) {
         const operator = this._currentFormula.shift();
-        // recursivley call the evaluator to get the result of the next term
         let nextRes: number = this.evaluator();
         operator === "+" ? result += nextRes : result -= nextRes;
     }
-      return result;
+
+    return result;
 }
+
 
   /**
     * place holder for the evaluator.   I am not sure what the type of the formula is yet 
@@ -101,8 +99,26 @@ export class FormulaEvaluator {
       this._errorMessage = ErrorMessages.emptyFormula;
       return;
     }
+
     // // Clone the formula to modify it
     this._currentFormula = [...formula];
+
+    // check for single token formula
+    if (formula.length === 1) {
+      let token = formula[0];
+      if (this.isNumber(token)) {
+        this._result = Number(token);
+        this._errorMessage = "";
+        return;
+      }
+      if (this.isCellReference(token)) {
+        [this._result, this._errorMessage] = this.getCellValue(token);
+        return;
+      }
+      this._result = 0;
+      this._errorMessage = ErrorMessages.invalidFormula;
+      return;
+    }
 
     // // reset the error flags and messages
     this._errorOccured = false;
