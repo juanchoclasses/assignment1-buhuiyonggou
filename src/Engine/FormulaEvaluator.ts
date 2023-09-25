@@ -18,54 +18,78 @@ export class FormulaEvaluator {
     this._sheetMemory = memory;
   }
 
-  private evaluator(): number {
+  /**
+   * Handle base cases, including parentheses
+   * @returns the result of the formula
+   */
+  private baseCase(): number {
     let result: number = 0;
-    // Get the next token
+    // Get the next token from the head of the formula
     let token = this._currentFormula.shift();
     // add numbers to the result and eliminate parentheses
     if (this.isNumber(token)) {
         result = Number(token);
-    } else if (token === "(") {
+    } else if (this.isCellReference(token)) {
+      let [val, error] = this.getCellValue(token);
+      // update result through the value of the cell
+      result = val ? val : 0;
+      if (error) {
+        this._errorOccured = true;
+        this._errorMessage = error;
+      }
+  } else if (token === "(") {
+        // evaluate the formula inside the parentheses by recursively calling the evaluator
         result = this.evaluator();
         if (this._currentFormula.length === 0 || this._currentFormula.shift() !== ")") {
             this._errorOccured = true;
             this._errorMessage = ErrorMessages.missingParentheses;
         }
-    } else if (this.isCellReference(token)) {
-        [result, this._errorMessage] = this.getCellValue(token);
-        if (this._errorMessage) {
-            this._errorOccured = true;
-        }
     } else {
         this._errorOccured = true;
         this._errorMessage = ErrorMessages.invalidFormula;
     }
+    return result;
+  }
 
-    // Regardless of whether the token was a number or cell reference, handle multiplication and division
+  /**
+   * Handle multiplication and division after basecases are settled
+   * @returns the result of the formula
+   */
+  private multDiv(): number {
+    // accumulate the result from basecases
+    let result: number = this.baseCase();
     while (this._currentFormula.length > 0 && (this._currentFormula[0] === "*" || this._currentFormula[0] === "/")) {
-        const op = this._currentFormula.shift();
-        let nextBlock: number = this.evaluator();
-        if (op === "*") {
-            result *= nextBlock;
+        let operator = this._currentFormula.shift();
+        // get the result of basecase as the current value
+        let baseCase: number = this.baseCase();
+        if (operator === "*") {
+            result *= baseCase;
         } else {
-            if (nextBlock === 0) {
+            if (baseCase === 0) {
                 this._errorOccured = true;
                 this._errorMessage = ErrorMessages.divideByZero;
             }
-            result /= nextBlock;
+            result /= baseCase;
         }
     }
+    return result;
+  }
 
-    // Handle addition and subtraction
+  /**
+   * Handle addition and subtraction after all other operations have been handled
+   * @returns the result of the formula
+   */
+  private evaluator(): number {
+    // accumulate the result
+    let result: number = this.multDiv();
+
     while (this._currentFormula.length > 0 && (this._currentFormula[0] === "+" || this._currentFormula[0] === "-")) {
         const operator = this._currentFormula.shift();
-        let nextRes: number = this.evaluator();
-        operator === "+" ? result += nextRes : result -= nextRes;
+        let multDivRes: number = this.multDiv();
+        operator === "+" ? result += multDivRes : result -= multDivRes;
     }
-
     return result;
 }
-
 
   /**
     * place holder for the evaluator.   I am not sure what the type of the formula is yet 
@@ -100,34 +124,16 @@ export class FormulaEvaluator {
       return;
     }
 
-    // // Clone the formula to modify it
-    this._currentFormula = [...formula];
-
-    // check for single token formula
-    if (formula.length === 1) {
-      let token = formula[0];
-      if (this.isNumber(token)) {
-        this._result = Number(token);
-        this._errorMessage = "";
-        return;
-      }
-      if (this.isCellReference(token)) {
-        [this._result, this._errorMessage] = this.getCellValue(token);
-        return;
-      }
-      this._result = 0;
-      this._errorMessage = ErrorMessages.invalidFormula;
-      return;
-    }
-
-    // // reset the error flags and messages
+    // reset the error flags and messages
     this._errorOccured = false;
     this._errorMessage = "";
+    // make a copy of the formula and take it as a queue
+    this._currentFormula = [...formula];
 
     this._result = this.evaluator();
 
-    // if there are still non-number tokens in the formula set the errorOccured flag
-    this._currentFormula.length > 0 ? this._errorMessage = ErrorMessages.invalidFormula: this._errorOccured = false;
+    // if there are still non-number tokens in the formula, return an error
+    this._currentFormula.length > 0 ? this._errorMessage = ErrorMessages.partial: this._errorOccured = false;
   }
 
   public get error(): string {
